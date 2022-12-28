@@ -4,7 +4,8 @@ require('dotenv').config();
 
 import { Telegraf, Markup } from 'telegraf';
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, serverTimestamp, push, child } from "firebase/database";
+import { doc, setDoc, getFirestore, collection } from "firebase/firestore"; 
+
 const { Configuration, OpenAIApi } = require("openai");
 
 const configuration = new Configuration({
@@ -32,7 +33,7 @@ const firebaseConfig = {
 };
 
 const firebase = initializeApp(firebaseConfig);
-const realtimeDB = getDatabase();
+const db = getFirestore();
 
 
 // const analytics = getAnalytics(app);
@@ -75,7 +76,6 @@ bot.command('start', async (ctx) => {
             Commands:
                 */commands* \\- _Display Code AI's commands\\._
                 */ask* \\- _Ask Code AI a programming related question\\._
-                */search* \\- _Search AI Overflow for an already answered question\\._
             
             `,
             // Markup.keyboard([
@@ -104,24 +104,6 @@ bot.command('commands', async (ctx) => {
     }, 60000);
 });
 
-bot.command('search', async (ctx) => {
-    
-    const text = ctx.update.message.text.substr(8);
-    const reply = await ctx.replyWithMarkdownV2(`
-    You've _searched_ for 
-    *"` + text + `"*\\.`);
-    
-    setTimeout(() => {
-        const replyId = reply.message_id;
-        const questionId = ctx.update.message.message_id;
-        if(questionId !== undefined) {
-            ctx.deleteMessage(questionId);
-        }
-        if (replyId !== undefined) {
-            ctx.deleteMessage(replyId);
-        }
-    }, 5000);
-});
 
 function recursivelyCheckExitCharacters(text: string): string {
     let indexOfErrorKey = text.indexOf('.');
@@ -144,12 +126,14 @@ bot.command('ask', async (ctx) => {
 
     const aiResponse = await callOpenAI(text);
 
-    push(ref(realtimeDB, 'queries'), {
-        question: text,
+    // Add a new document in collection "cities"
+    const dbItem = doc(collection(db, "queries"));
+    console.log(dbItem);
+    await setDoc(dbItem, {
+        id: dbItem.id,
         answer: aiResponse,
-        date: serverTimestamp()
-        // uid: firebase.database.ServerValue.increment(1)
-        // date: 
+        question: text,
+        date: new Date().getTime()
     });
 
     const aiReply =  await ctx.reply(
